@@ -1,17 +1,18 @@
-import { ReactNode } from 'react';
+import {Card, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {ReactNode} from 'react';
 
 interface IMetricCardProps {
   title: string;
-  value: number;
   children?: ReactNode;
 }
-const MetricCard = ({ title, value, children }: IMetricCardProps) => {
+const MetricCard = ({title, children}: IMetricCardProps) => {
   return (
-    <section>
-      <div>{title} </div>
-      <div>{value}</div>
-      <div>{children} </div>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription> {children}</CardDescription>
+      </CardHeader>
+    </Card>
   );
 };
 
