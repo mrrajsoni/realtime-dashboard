@@ -1,44 +1,45 @@
 import {WebSocketServer} from 'ws';
+import {Redis} from 'ioredis';
 
 const wss = new WebSocketServer({
   port: 8080,
 });
 
-const METRIC_FAKE_DATA = {
-  userCount: {
-    value: 10,
-    trend: 'up',
-    previousValue: 8,
-  },
-  sales: {
-    value: 100,
-    trend: 'down',
-    previousValue: 120,
-  },
-  errorRate: {
-    value: 1,
-    trend: 'up',
-    previousValue: 0.5,
-  },
-};
+const subscribersMap = new Map();
 
-function sendMetricData(metricName) {
-  return {
-    value: METRIC_FAKE_DATA[metricName].value,
-    trend: METRIC_FAKE_DATA[metricName].trend,
-    previousValue: METRIC_FAKE_DATA[metricName].previousValue,
-    metricName: metricName.toString(),
-  };
-}
+const redisClient = new Redis();
+
 wss.on('connection', (ws) => {
-  ws.on('message', (metricName) => {
-    console.log(`Received subscription for: ${metricName}`);
+  ws.on('message', (socketData) => {
+    const metricName = socketData.toString();
+    if (!subscribersMap.has(metricName)) {
+      subscribersMap.set(metricName, new Set());
+      redisClient.subscribe('metric:' + metricName);
+    }
+    subscribersMap.get(metricName)?.add(ws);
+  });
 
-    const interval = setInterval(() => {
-      const metricResult = sendMetricData(metricName);
-      ws.send(JSON.stringify(metricResult));
-    }, 5000);
+  ws.on('close', () => {
+    subscribersMap.forEach((value, key) => {
+      if (value.has(ws)) {
+        value.delete(ws);
+        if (value.size === 0) {
+          redisClient.unsubscribe('metric:' + key);
+          subscribersMap.delete(key);
+        }
+      }
+    });
+  });
+});
 
-    ws.on('close', () => clearInterval(interval)); // cleanup on disconnect
+redisClient.on('message', (channel, message) => {
+  console.log(`Received message for: ${channel} ${message}`);
+  subscribersMap.forEach((value, key) => {
+    const subscriberChannelName = 'metric:' + key;
+    if (subscriberChannelName === channel) {
+      value.forEach((ws) => {
+        ws.send(message);
+      });
+    }
   });
 });
