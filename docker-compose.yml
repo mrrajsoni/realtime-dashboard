@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:15
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRESS_PASS}
+      POSTGRES_DB: realtime-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  cache:
+    image: redis:alpine
+    ports:
+      - '6379:6379'
+
+volumes:
+  postgres_data:
