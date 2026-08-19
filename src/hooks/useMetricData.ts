@@ -9,13 +9,25 @@ type TMetricData = {
 
 export function useMetricData(metricName: string) {
   const [metricData, setMetricData] = useState<TMetricData>();
+
   useEffect(() => {
+    let cancelled = false;
     const socketInstance = webSocketManager;
+    const fetchInitialData = async () => {
+      const initialData = await fetch(`/api/metric?metric=${metricName}`);
+      const metricData = await initialData.json();
+      console.info(cancelled, 'cancel', metricName, 'metricName');
+      if (!cancelled) setMetricData(metricData);
+    };
+
+    fetchInitialData();
+
     const unsub = socketInstance.subscribe(metricName, (data) => {
-      console.info('Setter', data);
       setMetricData(data);
     });
+
     return () => {
+      cancelled = true;
       unsub();
     };
   }, [metricName]);
