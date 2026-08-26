@@ -11,6 +11,7 @@ const subscribersMap = new Map();
 const redisClient = new Redis();
 const pool = new Pool();
 
+// create metrics table
 await pool.query(`
   CREATE TABLE IF NOT EXISTS metrics (
   id SERIAL PRIMARY KEY,
@@ -20,6 +21,50 @@ await pool.query(`
   previous_value NUMERIC NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )
+`);
+
+//Create user table
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email_address TEXT UNIQUE NOT NULL,
+  pass_hash VARCHAR NOT NULL,
+  is_verified BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`);
+
+//Create OTP code table
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS otp_codes (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  otp_code_hash VARCHAR NOT NULL,
+  purpose TEXT NOT NULL,
+  expiry_time TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ
+  )
+`);
+
+//Create REFRESH TOKEN table
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  token_hash TEXT NOT NULL,
+  expiry_time TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  replaced_by INT REFERENCES refresh_tokens(id),
+  used_at TIMESTAMPTZ,
+  session_created_at TIMESTAMPTZ NOT NULL
+  )
+`);
+
+await pool.query(`
+  ALTER TABLE refresh_tokens 
+  ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS session_created_at TIMESTAMPTZ NOT NULL;
+
 `);
 
 redisClient.psubscribe('metric:*');

@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stale token snapshot — why apiFetch needs the freshness check</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --panel: #131a23;
+        --panel-2: #1a232e;
+        --line: #263241;
+        --text: #dbe4ee;
+        --dim: #7d8da1;
+        --a: #5eead4;
+        --b: #a5b4fc;
+        --c: #fbbf24;
+        --refresh: #f472b6;
+        --ok: #4ade80;
+        --bad: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.55 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 28px 24px 60px;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        color: var(--dim);
+        margin: 0 0 22px;
+        max-width: 74ch;
+      }
+      code,
+      .mono {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 12.5px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 14px;
+      }
+      button {
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        padding: 8px 15px;
+        border-radius: 7px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.ghost {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        padding: 7px 12px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .toggle input {
+        accent-color: #2563eb;
+        width: 15px;
+        height: 15px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 11px 13px;
+      }
+      .stat .k {
+        color: var(--dim);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+      }
+      .stat .v {
+        font-size: 21px;
+        font-weight: 650;
+        margin-top: 3px;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .stat.warn .v {
+        color: var(--bad);
+      }
+      .stat.good .v {
+        color: var(--ok);
+      }
+
+      .chart {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px 16px 8px;
+        overflow-x: auto;
+      }
+      .ruler {
+        position: relative;
+        height: 18px;
+        margin-left: 190px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 10px;
+      }
+      .tick {
+        position: absolute;
+        top: 0;
+        font-size: 10px;
+        color: var(--dim);
+        transform: translateX(-50%);
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .tick::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -6px;
+        width: 1px;
+        height: 5px;
+        background: var(--line);
+      }
+
+      .lane {
+        display: flex;
+        align-items: center;
+        height: 42px;
+      }
+      .lane-label {
+        width: 190px;
+        flex: 0 0 190px;
+        padding-right: 14px;
+      }
+      .lane-label .nm {
+        font-weight: 650;
+        font-size: 12.5px;
+      }
+      .lane-label .snap {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10.5px;
+        color: var(--dim);
+      }
+      .track {
+        position: relative;
+        height: 26px;
+        flex: 1;
+        border-left: 1px solid var(--line);
+      }
+      .track::before {
+        content: "";
+        position: absolute;
+        inset: 12px 0 auto 0;
+        height: 1px;
+        background: #1c2530;
+      }
+
+      .seg {
+        position: absolute;
+        top: 4px;
+        height: 18px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        padding: 0 6px;
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: 10px;
+        font-family: ui-monospace, Menlo, monospace;
+        color: #08111a;
+        font-weight: 650;
+      }
+      .seg.A {
+        background: var(--a);
+      }
+      .seg.B {
+        background: var(--b);
+      }
+      .seg.C {
+        background: var(--c);
+      }
+      .seg.R {
+        background: var(--refresh);
+      }
+      .seg.wait {
+        background: repeating-linear-gradient(
+          45deg,
+          #3b4757,
+          #3b4757 4px,
+          #2b3542 4px,
+          #2b3542 8px
+        );
+        color: var(--dim);
+      }
+
+      .mark {
+        position: absolute;
+        top: -2px;
+        width: 2px;
+        height: 30px;
+        background: var(--bad);
+      }
+      .mark span {
+        position: absolute;
+        left: 5px;
+        top: -1px;
+        font-size: 9.5px;
+        color: var(--bad);
+        font-family: ui-monospace, Menlo, monospace;
+        white-space: nowrap;
+      }
+      .mark.tok {
+        background: var(--ok);
+      }
+      .mark.tok span {
+        color: var(--ok);
+      }
+
+      .log {
+        margin-top: 16px;
+        background: #080c11;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 14px;
+        height: 250px;
+        overflow-y: auto;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .log div {
+        padding: 1.5px 0;
+        white-space: pre-wrap;
+      }
+      .log .t {
+        color: #55637a;
+      }
+      .log .lA {
+        color: var(--a);
+      }
+      .log .lB {
+        color: var(--b);
+      }
+      .log .lC {
+        color: var(--c);
+      }
+      .log .lR {
+        color: var(--refresh);
+      }
+      .log .imp {
+        color: var(--bad);
+        font-weight: 700;
+      }
+      .log .win {
+        color: var(--ok);
+        font-weight: 700;
+      }
+
+      .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        color: var(--dim);
+        font-size: 11.5px;
+        margin: 12px 0 0 190px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 5px;
+        vertical-align: -1px;
+      }
+      .note {
+        margin-top: 18px;
+        padding: 13px 15px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 3px solid #2563eb;
+        border-radius: 8px;
+        color: var(--dim);
+      }
+      .note b {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Why the token you send can go stale mid-request</h1>
+      <p class="sub">
+        Three API calls fire at once with the same expired token. Watch what each one's
+        <em>local snapshot</em> of the token is, versus what's live in <code>authManager</code>. The
+        timing below is produced by real promises and real timers — nothing here is a scripted
+        animation.
+      </p>
+
+      <div class="controls">
+        <button id="run">▶ Run the three requests</button>
+        <button id="reset" class="ghost">Reset</button>
+        <label class="toggle">
+          <input type="checkbox" id="check" checked />
+          <span><code>apiFetch</code> compares snapshot vs live token</span>
+        </label>
+      </div>
+
+      <div class="stats">
+        <div class="stat" id="s-live">
+          <div class="k">authManager.accessToken (live)</div>
+          <div class="v">tok_A</div>
+        </div>
+        <div class="stat" id="s-refresh">
+          <div class="k">/api/auth/refresh calls</div>
+          <div class="v">0</div>
+        </div>
+        <div class="stat" id="s-rot">
+          <div class="k">refresh tokens rotated</div>
+          <div class="v">0</div>
+        </div>
+        <div class="stat" id="s-clock">
+          <div class="k">clock</div>
+          <div class="v">0 ms</div>
+        </div>
+      </div>
+
+      <div class="chart">
+        <div class="ruler" id="ruler"></div>
+        <div id="lanes"></div>
+        <div class="legend">
+          <span><i style="background: var(--a)"></i>request in flight</span>
+          <span
+            ><i
+              style="
+                background: repeating-linear-gradient(45deg, #3b4757, #3b4757 4px, #2b3542 4px, #2b3542 8px);
+              "
+            ></i
+            >parked on someone else's refresh</span
+          >
+          <span><i style="background: var(--refresh)"></i>refresh network call</span>
+          <span><i style="background: var(--bad)"></i>401 received</span>
+          <span><i style="background: var(--ok)"></i>setAccessToken()</span>
+        </div>
+      </div>
+
+      <div class="log" id="log"></div>
+
+      <div class="note" id="note">
+        <b>Try this:</b> run it once with the checkbox on, then turn it off and run again. Watch the
+        <b>refresh calls</b> counter and request C's lane. C is the whole reason the check exists —
+        its 401 arrives <em>after</em> A's refresh already finished, so <code>pendingRefresh</code>
+        is back to <code>null</code> and C has no way to know a good token is already sitting in
+        <code>authManager</code> unless it compares.
+      </div>
+    </div>
+
+    <script>
+      // ────────────────────────────────────────────────────────────────
+      // Fake server. Only the most recently issued token is accepted.
+      // `null` means "the token everybody is currently holding is expired".
+      // ────────────────────────────────────────────────────────────────
+      const server = {
+        validToken: null,
+        issued: 1, // tok_A already handed out
+        rotations: 0,
+      };
+      const nextTokenName = () => "tok_" + String.fromCharCode(65 + server.issued++);
+
+      // ── the pieces from your real code ──────────────────────────────
+      const authManager = {
+        accessToken: "tok_A",
+        getAccessToken() {
+          return this.accessToken;
+        },
+        setAccessToken(t) {
+          this.accessToken = t;
+          mark("TOKEN", "tok", "setAccessToken(" + t + ")");
+          log("R", "authManager.setAccessToken(" + t + ")  ← the live field is now " + t, "win");
+          paintLive();
+        },
+      };
+
+      let pendingRefresh = null;
+      let refreshCalls = 0;
+
+      function refreshAccessToken() {
+        if (pendingRefresh) {
+          log("R", "refreshAccessToken(): one is already running → handing back the same job");
+          return pendingRefresh;
+        }
+        refreshCalls++;
+        paintStats();
+        const seg = beginSeg("REFRESH", "R", "POST /api/auth/refresh");
+        log("R", "refreshAccessToken(): nobody refreshing → starting one (call #" + refreshCalls + ")");
+
+        pendingRefresh = fakeFetch("/api/auth/refresh", null, 1000)
+          .then((res) => {
+            endSeg(seg);
+            if (res.status !== 200) throw new Error("AuthExpired");
+            return res.body;
+          })
+          .then((body) => {
+            authManager.setAccessToken(body.accessToken);
+            return body.accessToken;
+          })
+          .finally(() => {
+            pendingRefresh = null;
+            log("R", "pendingRefresh = null   (the note comes off the door)");
+          });
+
+        return pendingRefresh;
+      }
+
+      // ── apiFetch, with the freshness check behind a toggle ──────────
+      async function apiFetch(name, url, latency) {
+        const lane = name;
+        let token = authManager.getAccessToken(); // ← THE SNAPSHOT. A copy. Frozen from here on.
+        setSnapshot(lane, token);
+        log(lane, `apiFetch(${url}) → snapshot token = ${token}`);
+
+        let seg = beginSeg(lane, lane, `GET ${url}  [${token}]`);
+        const res = await fakeFetch(url, token, latency);
+        endSeg(seg);
+
+        if (res.status !== 401) {
+          log(lane, `${res.status} OK — done`, "win");
+          return res;
+        }
+
+        mark(lane, "", "401");
+        log(lane, `401 back. my snapshot is still ${token}`, "imp");
+
+        let newToken;
+        const live = authManager.getAccessToken();
+        const useCheck = document.getElementById("check").checked;
+
+        if (useCheck && live !== token) {
+          // Somebody else already refreshed while we were waiting on the network.
+          newToken = live;
+          log(
+            lane,
+            `snapshot=${token} vs live=${live} → DIFFERENT. Someone already refreshed for me. Skipping the network call.`,
+            "win"
+          );
+        } else {
+          if (useCheck) {
+            log(lane, `snapshot=${token} vs live=${live} → same. Nobody refreshed yet, so it's on me.`);
+          } else {
+            log(lane, `(check disabled) going straight to refreshAccessToken()`, "imp");
+          }
+          const waitSeg = beginSeg(lane, "wait", "await refreshAccessToken()");
+          newToken = await refreshAccessToken();
+          endSeg(waitSeg);
+        }
+
+        setSnapshot(lane, newToken);
+        seg = beginSeg(lane, lane, `RETRY ${url}  [${newToken}]`);
+        const retry = await fakeFetch(url, newToken, latency);
+        endSeg(seg);
+
+        if (retry.status === 401) {
+          log(lane, "retry ALSO 401 → throw AuthExpired", "imp");
+          throw new Error("AuthExpired");
+        }
+        log(lane, `retry ${retry.status} OK — done`, "win");
+        return retry;
+      }
+
+      // ── fake network ────────────────────────────────────────────────
+      function fakeFetch(url, token, latency) {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (url === "/api/auth/refresh") {
+              server.rotations++;
+              server.validToken = nextTokenName();
+              paintStats();
+              resolve({status: 200, body: {accessToken: server.validToken}});
+            } else if (token && token === server.validToken) {
+              resolve({status: 200, body: {ok: true}});
+            } else {
+              resolve({status: 401, body: {message: "Unauthorized access"}});
+            }
+          }, latency);
+        });
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // rendering
+      // ────────────────────────────────────────────────────────────────
+      const PX = 0.2,
+        SPAN = 5200;
+      const LANES = [
+        {id: "A", nm: "A  /api/metrics", lat: 400},
+        {id: "B", nm: "B  /api/profile", lat: 550},
+        {id: "C", nm: "C  /api/events (slow)", lat: 1900},
+        {id: "REFRESH", nm: "refreshAccessToken()", lat: 0},
+        {id: "TOKEN", nm: "authManager field", lat: 0},
+      ];
+      let t0 = 0,
+        running = false,
+        openSegs = [],
+        raf = 0;
+      const tracks = {};
+      const now = () => (t0 ? performance.now() - t0 : 0);
+      const px = (ms) => ms * PX + "px";
+
+      function build() {
+        const ruler = document.getElementById("ruler");
+        ruler.innerHTML = "";
+        for (let ms = 0; ms <= SPAN; ms += 500) {
+          const d = document.createElement("div");
+          d.className = "tick";
+          d.style.left = px(ms);
+          d.textContent = ms + (ms === 0 ? "ms" : "");
+          ruler.appendChild(d);
+        }
+        const host = document.getElementById("lanes");
+        host.innerHTML = "";
+        LANES.forEach((l) => {
+          const row = document.createElement("div");
+          row.className = "lane";
+          row.innerHTML =
+            `<div class="lane-label"><div class="nm">${l.nm}</div>` +
+            `<div class="snap" id="snap-${l.id}">${l.id.length === 1 ? "snapshot: —" : ""}</div></div>`;
+          const tr = document.createElement("div");
+          tr.className = "track";
+          tr.style.minWidth = px(SPAN);
+          row.appendChild(tr);
+          tracks[l.id] = tr;
+          host.appendChild(row);
+        });
+      }
+
+      function beginSeg(lane, kind, label) {
+        const el = document.createElement("div");
+        el.className = "seg " + kind;
+        el.style.left = px(now());
+        el.style.width = "0px";
+        el.textContent = label;
+        tracks[lane].appendChild(el);
+        const seg = {el, start: now(), open: true};
+        openSegs.push(seg);
+        return seg;
+      }
+      function endSeg(seg) {
+        seg.open = false;
+        seg.el.style.width = px(Math.max(now() - seg.start, 2));
+      }
+      function mark(lane, kind, label) {
+        const el = document.createElement("div");
+        el.className = "mark " + kind;
+        el.style.left = px(now());
+        el.innerHTML = `<span>${label}</span>`;
+        tracks[lane].appendChild(el);
+      }
+      function setSnapshot(lane, tok) {
+        const el = document.getElementById("snap-" + lane);
+        if (el) el.textContent = "snapshot: " + tok;
+      }
+      function log(lane, msg, cls) {
+        const d = document.createElement("div");
+        const ts = String(Math.round(now())).padStart(4, " ");
+        d.innerHTML =
+          `<span class="t">${ts}ms </span><span class="l${lane === "REFRESH" ? "R" : lane}">[${lane === "REFRESH" ? "refresh" : lane}]</span> ` +
+          `<span class="${cls || ""}">${msg}</span>`;
+        const box = document.getElementById("log");
+        box.appendChild(d);
+        box.scrollTop = box.scrollHeight;
+      }
+      function paintLive() {
+        document.querySelector("#s-live .v").textContent = authManager.accessToken;
+      }
+      function paintStats() {
+        document.querySelector("#s-refresh .v").textContent = refreshCalls;
+        document.querySelector("#s-rot .v").textContent = server.rotations;
+        document.getElementById("s-refresh").className = "stat " + (refreshCalls > 1 ? "warn" : refreshCalls === 1 ? "good" : "");
+      }
+      function tick() {
+        document.querySelector("#s-clock .v").textContent = Math.round(now()) + " ms";
+        openSegs.forEach((s) => {
+          if (s.open) s.el.style.width = px(Math.max(now() - s.start, 2));
+        });
+        if (running) raf = requestAnimationFrame(tick);
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      document.getElementById("run").onclick = async () => {
+        reset();
+        running = true;
+        t0 = performance.now();
+        raf = requestAnimationFrame(tick);
+        document.getElementById("run").disabled = true;
+
+        log("R", "── three requests fired at once, all holding tok_A (already expired) ──");
+
+        // All three start in the same tick. This is what "concurrent" means:
+        // one thread, three functions parked at their own `await`.
+        const jobs = LANES.filter((l) => l.id.length === 1).map((l) =>
+          apiFetch(l.id, l.nm.split("  ")[1], l.lat).catch((e) => log(l.id, "threw: " + e.message, "imp"))
+        );
+        await Promise.all(jobs);
+
+        log("R", "── all settled ──");
+        log(
+          "R",
+          refreshCalls > 1
+            ? `${refreshCalls} refresh calls for ONE expired token. C burned a round-trip it did not need.`
+            : `1 refresh call for 3 requests. C reused the token A had already fetched.`,
+          refreshCalls > 1 ? "imp" : "win"
+        );
+        running = false;
+        cancelAnimationFrame(raf);
+        tick();
+        document.getElementById("run").disabled = false;
+      };
+
+      function reset() {
+        cancelAnimationFrame(raf);
+        running = false;
+        t0 = 0;
+        openSegs = [];
+        server.validToken = null;
+        server.issued = 1;
+        server.rotations = 0;
+        authManager.accessToken = "tok_A";
+        pendingRefresh = null;
+        refreshCalls = 0;
+        document.getElementById("log").innerHTML = "";
+        build();
+        paintLive();
+        paintStats();
+        document.querySelector("#s-clock .v").textContent = "0 ms";
+      }
+      document.getElementById("reset").onclick = reset;
+      reset();
+    </script>
+  </body>
+</html>

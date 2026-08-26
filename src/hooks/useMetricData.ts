@@ -1,3 +1,4 @@
+import {apiFetch} from '@/Auth/apiFetch';
 import {webSocketManager} from '@/WebSocket/WebSocketManager';
 import {useEffect, useState} from 'react';
 
@@ -14,7 +15,7 @@ export function useMetricData(metricName: string) {
     let cancelled = false;
     const socketInstance = webSocketManager;
     const fetchInitialData = async () => {
-      const initialData = await fetch(`/api/metric?metric=${metricName}`);
+      const initialData = await apiFetch(`/api/metric?metric=${metricName}`);
       const metricData = await initialData.json();
       console.info(cancelled, 'cancel', metricName, 'metricName');
       if (!cancelled) setMetricData(metricData);

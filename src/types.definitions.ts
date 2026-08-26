@@ -4,3 +4,5 @@ export type TMetricData = {
   previousValue: number;
   metricName: string;
 };
+
+export type TAuthenticationStatus = 'checking' | 'authenticated' | 'unauthenticated';
