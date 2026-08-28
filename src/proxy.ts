@@ -46,5 +46,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/((?!auth/login|auth/register|auth/verify-otp|auth/refresh).*)'],
+  // auth/logout is excluded because it authenticates off the refreshToken cookie and
+  // never reads x-user-id — and the client clears the access token before calling it.
+  matcher: ['/api/((?!auth/login|auth/register|auth/verify-otp|auth/refresh|auth/logout).*)'],
 };

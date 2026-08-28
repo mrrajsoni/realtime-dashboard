@@ -13,10 +13,20 @@ function withAuthHeader(token: string, options?: RequestInit): RequestInit {
   };
 }
 
+const callRefreshAccessToken = async () => {
+  try {
+    const token = await refreshAccessToken();
+    return token;
+  } catch {
+    authManager.notifySessionExpired();
+    throw new Error('AuthExpired');
+  }
+};
+
 export const apiFetch = async (url: string, options?: RequestInit): Promise<Response> => {
   let token = authManager.getAccessToken();
   if (!token) {
-    token = await refreshAccessToken();
+    token = await callRefreshAccessToken();
   }
 
   const response = await fetch(url, withAuthHeader(token, options));
@@ -24,10 +34,10 @@ export const apiFetch = async (url: string, options?: RequestInit): Promise<Resp
   if (response.status !== 401) {
     return response;
   }
+  //retry once
+  token = await callRefreshAccessToken();
 
-  const newToken = await refreshAccessToken();
-
-  const retryResponse = await fetch(url, withAuthHeader(newToken, options));
+  const retryResponse = await fetch(url, withAuthHeader(token, options));
 
   if (retryResponse.status === 401) {
     authManager.notifySessionExpired();

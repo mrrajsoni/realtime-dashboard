@@ -3,6 +3,7 @@ import {Geist, Geist_Mono, DM_Sans} from 'next/font/google';
 import './globals.css';
 import {cn} from '@/lib/utils';
 import AuthProvider from '@/Providers/AuthProvider';
+import {Toaster} from 'sonner';
 
 const dmSans = DM_Sans({subsets: ['latin'], variable: '--font-sans'});
 
@@ -29,6 +30,7 @@ export default function RootLayout({children}: LayoutProps<'/'>) {
     >
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <Toaster position="top-center" />
       </body>
     </html>
   );

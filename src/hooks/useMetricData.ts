@@ -21,7 +21,9 @@ export function useMetricData(metricName: string) {
       if (!cancelled) setMetricData(metricData);
     };
 
-    fetchInitialData();
+    // apiFetch throws AuthExpired on a dead session; AuthManager's listeners already
+    // handle the redirect, so swallow it here instead of leaking an unhandled rejection.
+    fetchInitialData().catch(() => {});
 
     const unsub = socketInstance.subscribe(metricName, (data) => {
       setMetricData(data);

@@ -1,6 +1,7 @@
 'use client';
 
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {useRouter} from 'next/navigation';
 import {FormEvent, useState} from 'react';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,6 +15,7 @@ type TFieldErrors = {
 };
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [step, setStep] = useState<'register' | 'verify-otp'>('register');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -86,6 +88,9 @@ export default function RegisterPage() {
 
       if (response.ok) {
         setServerMessage({type: 'success', text: data.message});
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
       } else {
         setServerMessage({type: 'error', text: data.message ?? 'Verification failed'});
       }
@@ -120,7 +125,9 @@ export default function RegisterPage() {
                     className="rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder="you@example.com"
                   />
-                  {fieldErrors.email && <p className="text-sm text-destructive">{fieldErrors.email}</p>}
+                  {fieldErrors.email && (
+                    <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -136,7 +143,9 @@ export default function RegisterPage() {
                     className="rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder="At least 8 characters"
                   />
-                  {fieldErrors.pass && <p className="text-sm text-destructive">{fieldErrors.pass}</p>}
+                  {fieldErrors.pass && (
+                    <p className="text-sm text-destructive">{fieldErrors.pass}</p>
+                  )}
                 </div>
 
                 {serverMessage && (
@@ -165,7 +174,9 @@ export default function RegisterPage() {
           <>
             <CardHeader>
               <CardTitle>Verify your email</CardTitle>
-              <CardDescription>Enter the {OTP_LENGTH}-digit code sent to {email}</CardDescription>
+              <CardDescription>
+                Enter the {OTP_LENGTH}-digit code sent to {email}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="flex flex-col gap-4" onSubmit={handleOtpSubmit} noValidate>

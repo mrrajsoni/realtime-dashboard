@@ -1,5 +1,7 @@
 'use client';
+
 import {authManager} from '@/Auth/AuthManager';
+import {logoutUser} from '@/Auth/logoutUser';
 import {refreshAccessToken} from '@/Auth/refreshAccessToken';
 import {AuthContext} from '@/Context/AuthContext';
 import {TAuthenticationStatus} from '@/types.definitions';
@@ -17,6 +19,22 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
     setAuthenticationStatus('authenticated');
   };
 
+  const handleOnLogout = () => {
+    authManager.clearAccessToken();
+    // ponytail: the local token is already gone, so a failed server revoke still
+    // logs the user out here — it just gets a vaguer message.
+    return logoutUser()
+      .catch(() => ({message: 'Signed out on this device'}))
+      .then((body) => {
+        debugger;
+        setAuthenticationStatus('unauthenticated');
+        setTimeout(() => {
+          router.push('/login');
+        }, 500);
+        return {message: body?.message ?? 'Signed out'};
+      });
+  };
+
   useEffect(() => {
     if (authenticationStatus === 'checking') {
       refreshAccessToken()
@@ -27,7 +45,6 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
           setAuthenticationStatus('unauthenticated');
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -44,6 +61,7 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
       value={{
         authenticationStatus,
         onLogin: handleOnLogin,
+        onLogout: handleOnLogout,
       }}
     >
       {children}

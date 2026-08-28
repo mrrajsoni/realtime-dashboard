@@ -58,6 +58,12 @@ export default function LoginPage() {
     }
   };
 
+  useEffect(() => {
+    if (auth.authenticationStatus === 'authenticated') {
+      router.push('/');
+    }
+  }, [auth.authenticationStatus, router]);
+
   if (auth.authenticationStatus === 'authenticated') {
     return null;
   }
