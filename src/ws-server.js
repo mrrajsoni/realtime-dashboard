@@ -95,7 +95,6 @@ wss.on('connection', async (ws, req) => {
     if (!ws.isAuthenticated) {
       return;
     }
-    console.info('All good');
     const metricName = socketData.toString();
     if (!subscribersMap.has(metricName)) {
       subscribersMap.set(metricName, new Set());
