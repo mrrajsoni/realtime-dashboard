@@ -47,7 +47,6 @@ export default function LoginPage() {
 
       if (response.ok) {
         auth.onLogin(data.accessToken);
-        router.push('/');
       } else {
         setServerMessage(data.message ?? 'Login failed');
       }

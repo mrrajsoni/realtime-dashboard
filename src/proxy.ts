@@ -35,7 +35,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({
       request: {headers: requestHeaders},
     });
-  } catch (_error) {
+  } catch {
     return NextResponse.json(
       {
         message: 'Unauthorized access',

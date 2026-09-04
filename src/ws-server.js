@@ -9,6 +9,8 @@ const wss = new WebSocketServer({
 const subscribersMap = new Map();
 
 const redisClient = new Redis();
+const ticketRedisClient = new Redis();
+
 const pool = new Pool();
 
 // create metrics table
@@ -69,8 +71,31 @@ await pool.query(`
 
 redisClient.psubscribe('metric:*');
 
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws, req) => {
+  const url = new URL(req.url, 'http://localhost:8080');
+  const searchParams = url.searchParams;
+  const ticketFromParam = searchParams.get('ticket');
+
+  if (!ticketFromParam) {
+    ws.close(4401, 'Missing ticket');
+    return;
+  }
+
+  const ticketId = await ticketRedisClient.getdel(`ws:ticket:${ticketFromParam}`);
+
+  if (!ticketId) {
+    ws.close(4401, 'Invalid ticket id');
+    return;
+  }
+
+  ws.userId = ticketId;
+  ws.isAuthenticated = true;
+
   ws.on('message', (socketData) => {
+    if (!ws.isAuthenticated) {
+      return;
+    }
+    console.info('All good');
     const metricName = socketData.toString();
     if (!subscribersMap.has(metricName)) {
       subscribersMap.set(metricName, new Set());

@@ -5,6 +5,7 @@ import {logoutUser} from '@/Auth/logoutUser';
 import {refreshAccessToken} from '@/Auth/refreshAccessToken';
 import {AuthContext} from '@/Context/AuthContext';
 import {TAuthenticationStatus} from '@/types.definitions';
+import {webSocketManager} from '@/WebSocket/WebSocketManager';
 import {useRouter} from 'next/navigation';
 import {ReactNode, useEffect, useState} from 'react';
 
@@ -17,6 +18,7 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
   const handleOnLogin = (accessToken: string) => {
     authManager.setAccessToken(accessToken);
     setAuthenticationStatus('authenticated');
+    router.push('/');
   };
 
   const handleOnLogout = () => {
@@ -26,11 +28,8 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
     return logoutUser()
       .catch(() => ({message: 'Signed out on this device'}))
       .then((body) => {
-        debugger;
+        webSocketManager.closeConnection();
         setAuthenticationStatus('unauthenticated');
-        setTimeout(() => {
-          router.push('/login');
-        }, 500);
         return {message: body?.message ?? 'Signed out'};
       });
   };
@@ -45,11 +44,15 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
           setAuthenticationStatus('unauthenticated');
         });
     }
+    return () => {
+      console.info('Unmounting');
+    };
   }, []);
 
   useEffect(() => {
     const unsubscribe = authManager.subscribe('authProvider', () => {
       setAuthenticationStatus('unauthenticated');
+      webSocketManager.closeConnection();
       router.push('/login');
     });
 
