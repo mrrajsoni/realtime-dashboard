@@ -104,8 +104,14 @@ class WebSocketManager {
 
   public subscribe(metricName: string, callBack: (data: TMetricData) => void) {
     this.listeners.set(metricName, callBack);
-    if (!this.socket) this.connect();
-
+    //there could be 3 dead state when we might need to invoke the connection request again if anyone passed
+    if (
+      !this.socket ||
+      (this.socket?.readyState !== WebSocket.OPEN &&
+        this.socket?.readyState !== WebSocket.CONNECTING)
+    ) {
+      this.connect();
+    }
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(metricName);
     }
