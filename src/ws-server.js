@@ -81,7 +81,14 @@ wss.on('connection', async (ws, req) => {
     return;
   }
 
-  const ticketId = await ticketRedisClient.getdel(`ws:ticket:${ticketFromParam}`);
+  let ticketId = null;
+
+  try {
+    ticketId = await ticketRedisClient.getdel(`ws:ticket:${ticketFromParam}`);
+  } catch {
+    ws.close(1011, 'Server issue. Error fetching ticket');
+    return;
+  }
 
   if (!ticketId) {
     ws.close(4401, 'Invalid ticket id');

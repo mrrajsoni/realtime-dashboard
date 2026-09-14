@@ -39,7 +39,7 @@ class WebSocketManager {
         return value.json();
       })
       .catch(() => {
-        this.requestedTicket = null;
+        return {ticket: null};
       });
 
     const {ticket} = await this.requestedTicket;
@@ -67,12 +67,24 @@ class WebSocketManager {
 
     this.socket.onclose = async (event) => {
       const code = event.code;
-      if (code === 4401 && this.retryOnRefreshAttempts < 1) {
+      const isServerError = code === 1011;
+      const isAuthorizationError = code === 4401;
+      if (isServerError) {
+        this.onClose();
+        return;
+      }
+
+      if (isAuthorizationError && this.retryOnRefreshAttempts < 1) {
         this.retryOnRefreshAttempts += 1;
-        await refreshAccessToken();
+        try {
+          await refreshAccessToken();
+        } catch {
+          return;
+        }
         this.connect();
         return;
       }
+
       this.onClose();
     };
 
