@@ -8,7 +8,7 @@ class WebSocketManager {
   private listeners: Map<string, (data: TMetricData) => void>;
   private connectionAttempts: number;
   private retryOnRefreshAttempts: number;
-  private requestedTicket: Promise<{ticket: string}> | null;
+  private requestedTicket: Promise<void> | null;
 
   constructor() {
     this.listeners = new Map<string, (data: TMetricData) => void>();
@@ -17,86 +17,94 @@ class WebSocketManager {
     this.requestedTicket = null;
   }
 
-  public async connect() {
+  public async connect(): Promise<void> {
     if (
       this.socket?.readyState === WebSocket.OPEN ||
       this.socket?.readyState === WebSocket.CONNECTING
-    )
+    ) {
       return;
+    }
 
     if (!authManager.getAccessToken()) {
       return;
     }
 
+    // if one caller already requested for the ticket, make it adopt the same promise
     if (this.requestedTicket) {
       return this.requestedTicket;
     }
 
-    this.requestedTicket = apiFetch('/api/ws-ticket', {
-      method: 'POST',
-    })
-      .then((value) => {
-        return value.json();
-      })
-      .catch(() => {
-        return {ticket: null};
-      });
+    this.requestedTicket = (async () => {
+      try {
+        const response = await apiFetch('/api/ws-ticket', {
+          method: 'POST',
+        });
+        const {ticket} = await response.json();
 
-    const {ticket} = await this.requestedTicket;
-    if (!ticket) {
-      this.requestedTicket = null;
-      return;
-    }
-
-    this.socket = new WebSocket(`ws://localhost:8080?ticket=${ticket}`);
-    this.requestedTicket = null;
-
-    this.socket.onopen = () => {
-      this.reset();
-      this.listeners.forEach((_, key) => {
-        if (key) {
-          this.socket?.send(key);
-        }
-      });
-    };
-
-    this.socket.onmessage = (event: MessageEvent) => {
-      const parsedJson = JSON.parse(event.data) as TMetricData;
-      this.listeners.get(parsedJson.metricName)?.(parsedJson);
-    };
-
-    this.socket.onclose = async (event) => {
-      const code = event.code;
-      const isServerError = code === 1011;
-      const isAuthorizationError = code === 4401;
-      if (isServerError) {
-        this.onClose();
-        return;
-      }
-
-      if (isAuthorizationError && this.retryOnRefreshAttempts < 1) {
-        this.retryOnRefreshAttempts += 1;
-        try {
-          await refreshAccessToken();
-        } catch {
+        if (
+          !ticket ||
+          this.socket?.readyState === WebSocket.CONNECTING ||
+          this.socket?.readyState === WebSocket.OPEN
+        )
           return;
-        }
-        this.connect();
-        return;
+
+        const socket = new WebSocket(`ws://localhost:8080?ticket=${ticket}`);
+        this.socket = socket;
+
+        socket.onopen = () => {
+          this.reset();
+          this.listeners.forEach((_, key) => {
+            if (key) {
+              socket.send(key);
+            }
+          });
+        };
+
+        socket.onmessage = (event: MessageEvent) => {
+          const parsedJson = JSON.parse(event.data) as TMetricData;
+          this.listeners.get(parsedJson.metricName)?.(parsedJson);
+        };
+
+        socket.onclose = async (event) => {
+          const code = event.code;
+          const isServerError = code === 1011;
+          const isAuthorizationError = code === 4401;
+          if (isServerError) {
+            this.onClose();
+            return;
+          }
+
+          if (isAuthorizationError && this.retryOnRefreshAttempts < 1) {
+            this.retryOnRefreshAttempts += 1;
+            try {
+              await refreshAccessToken();
+            } catch {
+              return;
+            }
+            this.connect();
+            return;
+          }
+
+          this.onClose();
+        };
+
+        socket.onerror = (event) => {
+          console.error('WebSocket Error:', event);
+          this.onError();
+        };
+      } catch (error) {
+        console.error('Failed to establish WebSocket ticket/connection:', error);
+      } finally {
+        this.requestedTicket = null;
       }
+    })();
 
-      this.onClose();
-    };
-
-    this.socket.onerror = (event) => {
-      console.error('WebSocket Error:', event);
-      this.onError();
-    };
+    return this.requestedTicket;
   }
 
   public subscribe(metricName: string, callBack: (data: TMetricData) => void) {
-    if (!this.socket) this.connect();
     this.listeners.set(metricName, callBack);
+    if (!this.socket) this.connect();
 
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(metricName);
