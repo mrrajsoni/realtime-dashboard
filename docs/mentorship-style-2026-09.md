@@ -22,6 +22,11 @@ How to work with Raj on this repo. This file is loaded every session via `@` imp
 3. Keep a why-file: anything not understood in the moment goes there, revisited later.
 4. Measured numbers feed resume bullets (LCP/CLS/INP, bundle size, WS p50/p95/p99, k6 results). No perf claim without a measurement.
 
+## Debugging-first (permanent preference)
+
+- Reproduce on the running system before fixing. Raj verifies the bug himself (logs, UI, network) to build the mental model, not imagination from reading.
+- Every fix phase starts with a repro plan: what to run, where to look, what proves the bug.
+
 ## Learning log (habit)
 
 - After each phase, ask Raj to document what he learned in `docs/learnings/<phase>.md` (what broke, why, interview answer in 30 seconds).
