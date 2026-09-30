@@ -5,13 +5,13 @@ import {TMetricData} from '@/types.definitions';
 
 class WebSocketManager {
   private socket: WebSocket | null = null;
-  private listeners: Map<string, (data: TMetricData) => void>;
+  private listeners: Map<string, Set<(data: TMetricData) => void>>;
   private connectionAttempts: number;
   private retryOnRefreshAttempts: number;
   private requestedTicket: Promise<void> | null;
 
   constructor() {
-    this.listeners = new Map<string, (data: TMetricData) => void>();
+    this.listeners = new Map<string, Set<(data: TMetricData) => void>>();
     this.connectionAttempts = 0;
     this.retryOnRefreshAttempts = 0;
     this.requestedTicket = null;
@@ -62,7 +62,9 @@ class WebSocketManager {
 
         socket.onmessage = (event: MessageEvent) => {
           const parsedJson = JSON.parse(event.data) as TMetricData;
-          this.listeners.get(parsedJson.metricName)?.(parsedJson);
+          this.listeners.get(parsedJson.metricName)?.forEach((value) => {
+            value(parsedJson);
+          });
         };
 
         socket.onclose = async (event) => {
@@ -103,7 +105,13 @@ class WebSocketManager {
   }
 
   public subscribe(metricName: string, callBack: (data: TMetricData) => void) {
-    this.listeners.set(metricName, callBack);
+    let listeners = this.listeners.get(metricName);
+    if (!listeners) {
+      listeners = new Set();
+      this.listeners.set(metricName, listeners);
+    }
+    listeners.add(callBack);
+
     //there could be 3 dead state when we might need to invoke the connection request again if anyone passed
     if (
       !this.socket ||
@@ -117,7 +125,10 @@ class WebSocketManager {
     }
 
     return () => {
-      this.listeners.delete(metricName);
+      listeners.delete(callBack);
+      if (listeners.size === 0) {
+        this.listeners.delete(metricName);
+      }
     };
   }
 

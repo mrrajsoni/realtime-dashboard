@@ -27,6 +27,12 @@ How to work with Raj on this repo. This file is loaded every session via `@` imp
 - Reproduce on the running system before fixing. Raj verifies the bug himself (logs, UI, network) to build the mental model, not imagination from reading.
 - Every fix phase starts with a repro plan: what to run, where to look, what proves the bug.
 
+## Scale lens (permanent preference)
+
+- Frame every phase against real large-scale systems (LinkedIn, Instagram, Netflix, YouTube, large SaaS), not just this project's 3-metric scope.
+- For each mechanism, name who solves it at scale and how (e.g. fan-out, replay cache, deduped fetch) — then decide what this repo skips and why.
+- Deferred scale items go to `docs/architecture-2026-09.md` open questions with the scale framing, not dropped.
+
 ## Learning log (habit)
 
 - After each phase, ask Raj to document what he learned in `docs/learnings/<phase>.md` (what broke, why, interview answer in 30 seconds).

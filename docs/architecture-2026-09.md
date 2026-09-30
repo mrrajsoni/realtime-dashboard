@@ -199,6 +199,18 @@ Things I could not answer from reading, listed so the next investigation has a s
 2. `/api/ws-ticket` mints a 10-second Redis ticket, and `ws-server.js` opens a second Redis client
    (`ticketRedisClient`) to redeem it — but never does. What is the intended handshake?
 3. Seven connection pools: does this matter at one user, and at what point does it?
+4. Deferred (multi-subscriber follow-up): each `useMetricData` mount does its own
+   `GET /api/metric?metric=…`, so N cards on one metric = N point-reads that can briefly
+   disagree across a 5s producer tick before WS fan-out reconverges them. At LinkedIn/Instagram/
+   Netflix/YouTube scale this is solved with a replay cache (last value per metric, late
+   subscriber gets it instantly) or deduped in-flight fetch. Skipped until a real large-data
+   scenario exercises it.
+5. Parked (multi-subscriber polish): `subscribe` re-sends the metric name on every call when
+   the socket is OPEN (`WebSocketManager.ts:123-125`), so N cards on one metric = N identical
+   frames; the server dedups via `Set.add` (`ws-server.js:109`), so correct but wasteful.
+   Cleanup also touches the captured Set instead of re-getting from the map. At YouTube-live
+   scale (100k watchers, one match) this is a subscribe storm for zero new information.
+   Parked with item 4.
 
 ```
 
