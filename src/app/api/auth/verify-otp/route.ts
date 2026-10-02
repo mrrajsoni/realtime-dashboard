@@ -1,14 +1,15 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {Pool} from 'pg';
 import bcrypt from 'bcrypt';
+import {dbPoolForClient} from '@/lib/DbPool/dbPoolForClient';
 
-const pool = new Pool();
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const userOtp = body.otp;
   const userEmail = body.email;
 
-  const queryUser = await pool.query(`SELECT id FROM users WHERE email_address = $1`, [userEmail]);
+  const queryUser = await dbPoolForClient.query(`SELECT id FROM users WHERE email_address = $1`, [
+    userEmail,
+  ]);
 
   if (!queryUser.rows[0]) {
     return NextResponse.json(
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const otpVerification = await pool.query(
+  const otpVerification = await dbPoolForClient.query(
     `SELECT id, user_id, otp_code_hash, expiry_time, consumed_at, purpose FROM otp_codes WHERE user_id = $1 AND purpose = $2 ORDER BY id DESC`,
     [queryUser.rows[0].id, 'registration']
   );
@@ -71,12 +72,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await pool.query(`UPDATE otp_codes SET consumed_at = NOW() WHERE id = $1 AND purpose = $2`, [
-    otpVerification.rows[0].id,
-    otpVerification.rows[0].purpose,
-  ]);
+  await dbPoolForClient.query(
+    `UPDATE otp_codes SET consumed_at = NOW() WHERE id = $1 AND purpose = $2`,
+    [otpVerification.rows[0].id, otpVerification.rows[0].purpose]
+  );
 
-  await pool.query(`UPDATE users SET is_verified = $1 WHERE email_address = $2`, [true, userEmail]);
+  await dbPoolForClient.query(`UPDATE users SET is_verified = $1 WHERE email_address = $2`, [
+    true,
+    userEmail,
+  ]);
 
   return NextResponse.json({
     message: 'Successfully verified',

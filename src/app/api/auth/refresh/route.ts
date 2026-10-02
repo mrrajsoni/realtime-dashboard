@@ -1,9 +1,8 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {Pool, PoolClient} from 'pg';
+import {PoolClient} from 'pg';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-
-const pool = new Pool();
+import {dbPoolForClient} from '@/lib/DbPool/dbPoolForClient';
 
 export async function POST(request: NextRequest) {
   const refreshTokenFromCookie = request.cookies.get('refreshToken');
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
     .update(refreshTokenFromCookie?.value as string)
     .digest('hex');
 
-  const client = await pool.connect();
+  const client = await dbPoolForClient.connect();
 
   try {
     await client.query('BEGIN');

@@ -1,17 +1,16 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {Pool} from 'pg';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { dbPoolForClient } from '@/lib/DbPool/dbPoolForClient';
 
-const pool = new Pool();
 
 export async function POST(request: NextRequest) {
   const requestBody = await request.json();
   const email = requestBody.email;
   const password = requestBody.password;
 
-  const queryUser = await pool.query(
+  const queryUser = await dbPoolForClient.query(
     `SELECT id, email_address, pass_hash, is_verified FROM users WHERE email_address = $1`,
     [email]
   );
@@ -74,7 +73,7 @@ export async function POST(request: NextRequest) {
   const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const refreshTokenExpiry = Date.now() + 604800000; // 7 days in milliseconds (7 * 24 * 60 * 60 * 1000)
 
-  await pool.query(
+  await dbPoolForClient.query(
     `INSERT INTO  refresh_tokens (token_hash, expiry_time, user_id, session_created_at) VALUES ($1, $2, $3, $4)`,
     [refreshTokenHash, new Date(refreshTokenExpiry), userId, new Date()]
   );

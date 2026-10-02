@@ -1,7 +1,6 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {Pool} from 'pg';
 import crypto from 'crypto';
-const pool = new Pool();
+import { dbPoolForClient } from '@/lib/DbPool/dbPoolForClient';
 
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get('refreshToken')?.value;
@@ -21,7 +20,7 @@ export async function POST(request: NextRequest) {
     .update(refreshToken)
     .digest('hex');
 
-  await pool.query(
+  await dbPoolForClient.query(
     `UPDATE refresh_tokens
     SET revoked_at = NOW()
     WHERE token_hash = $1 

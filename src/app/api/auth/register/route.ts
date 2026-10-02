@@ -1,11 +1,9 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {Pool} from 'pg';
 import bcrypt from 'bcrypt';
 import {Resend} from 'resend';
+import {dbPoolForClient} from '@/lib/DbPool/dbPoolForClient';
 
 const resend = new Resend(process.env.RESEND_API);
-
-const pool = new Pool();
 
 function generateOTP() {
   const digits = '0123456789';
@@ -21,9 +19,10 @@ export async function POST(request: NextRequest) {
 
   const email = requestBody.email;
   const pass = requestBody.pass;
-  const emailRow = await pool.query(`SELECT email_address FROM users where email_address = $1`, [
-    email,
-  ]);
+  const emailRow = await dbPoolForClient.query(
+    `SELECT email_address FROM users where email_address = $1`,
+    [email]
+  );
 
   const doesEmailExist = emailRow.rowCount;
 
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await bcrypt.hash(pass, 10);
 
-  const insertedIntoUserRow = await pool.query(
+  const insertedIntoUserRow = await dbPoolForClient.query(
     `INSERT INTO users (email_address, pass_hash, is_verified) VALUES ($1, $2, $3) RETURNING *`,
     [email, passwordHash, false]
   );
@@ -51,7 +50,7 @@ export async function POST(request: NextRequest) {
 
   const tenMinutesLater = new Date(Date.now() + 10 * 60 * 1000);
 
-  await pool.query(
+  await dbPoolForClient.query(
     `INSERT INTO otp_codes (user_id, otp_code_hash, purpose, expiry_time) VALUES ($1, $2, $3, $4)`,
     [insertedIntoUserRow.rows[0].id, otpHash, 'registration', tenMinutesLater]
   );
