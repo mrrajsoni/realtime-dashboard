@@ -4,7 +4,7 @@ import {authManager} from '@/Auth/AuthManager';
 import {logoutUser} from '@/Auth/logoutUser';
 import {refreshAccessToken} from '@/Auth/refreshAccessToken';
 import {AuthContext} from '@/Context/AuthContext';
-import {TAuthenticationStatus} from '@/types.definitions';
+import {TAuthenticationStatus} from '@/lib/types.definitions';
 import {webSocketManager} from '@/WebSocket/WebSocketManager';
 import {useRouter} from 'next/navigation';
 import {ReactNode, useEffect, useState} from 'react';

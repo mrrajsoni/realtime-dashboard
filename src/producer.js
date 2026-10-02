@@ -1,6 +1,4 @@
-import Redis from 'ioredis';
-
-const redisClient = new Redis();
+import {redisClient} from './redisClientForServer.js';
 
 const METRIC_FAKE_DATA = {
   userCount: {

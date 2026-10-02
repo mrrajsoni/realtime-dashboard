@@ -1,7 +1,7 @@
 import {apiFetch} from '@/Auth/apiFetch';
 import {authManager} from '@/Auth/AuthManager';
 import {refreshAccessToken} from '@/Auth/refreshAccessToken';
-import {TMetricData} from '@/types.definitions';
+import {TMetricData} from '@/lib/types.definitions';
 
 class WebSocketManager {
   private socket: WebSocket | null = null;

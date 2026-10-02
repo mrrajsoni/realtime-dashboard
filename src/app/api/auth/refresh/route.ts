@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
     .update(refreshTokenFromCookie?.value as string)
     .digest('hex');
 
-  const client = await dbPoolForClient.connect();
+  let client: PoolClient | null = null;
 
   try {
+    client = await dbPoolForClient.connect();
     await client.query('BEGIN');
 
     const queryRefreshTokenTable = await client.query(
@@ -113,10 +114,20 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
+    if (!client) throw error;
+
+    await client
+      .query('ROLLBACK')
+      .then(() => {
+        throw error;
+      })
+      .catch(() => {
+        throw error;
+      });
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 }
 

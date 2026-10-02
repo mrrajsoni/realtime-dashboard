@@ -1,5 +1,5 @@
 'use client';
-import {TAuthenticationStatus} from '@/types.definitions';
+import {TAuthenticationStatus} from '@/lib/types.definitions';
 import {createContext} from 'react';
 
 interface IAuthContext {

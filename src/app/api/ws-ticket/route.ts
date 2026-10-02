@@ -1,7 +1,5 @@
+import {redisClient} from '@/lib/redisClientForClient';
 import {NextRequest, NextResponse} from 'next/server';
-import {Redis} from 'ioredis';
-
-const redisClient = new Redis();
 
 export async function POST(request: NextRequest) {
   const headers = request.headers;

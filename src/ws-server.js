@@ -1,15 +1,14 @@
 import {WebSocketServer} from 'ws';
-import {Redis} from 'ioredis';
 import {Pool} from 'pg';
+import {redisClient} from './redisClientForServer.js';
+import Redis from 'ioredis';
 
+const redisTicketClient = new Redis();
 const wss = new WebSocketServer({
   port: 8080,
 });
 
 const subscribersMap = new Map();
-
-const redisClient = new Redis();
-const ticketRedisClient = new Redis();
 
 const pool = new Pool();
 
@@ -84,7 +83,7 @@ wss.on('connection', async (ws, req) => {
   let ticketId = null;
 
   try {
-    ticketId = await ticketRedisClient.getdel(`ws:ticket:${ticketFromParam}`);
+    ticketId = await redisTicketClient.getdel(`ws:ticket:${ticketFromParam}`);
   } catch {
     ws.close(1011, 'Server issue. Error fetching ticket');
     return;
