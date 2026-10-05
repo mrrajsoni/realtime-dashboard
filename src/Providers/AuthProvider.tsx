@@ -40,7 +40,10 @@ const AuthProvider = ({children}: {children: ReactNode}) => {
         .then(() => {
           setAuthenticationStatus('authenticated');
         })
-        .catch(() => {
+        .catch((error) => {
+          if (error instanceof Error && error.message === 'ServiceUnavailable') {
+            return;
+          }
           setAuthenticationStatus('unauthenticated');
         });
     }

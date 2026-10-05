@@ -124,16 +124,44 @@ export async function POST(request: NextRequest) {
 
     return await rotateAndRespond(client, rowId, userId, sessionCreationTime);
   } catch (error) {
-    if (!client) throw error;
+    if (!client) {
+      return NextResponse.json(
+        {
+          message: 'Database down',
+        },
+        {
+          status: 503,
+        }
+      );
+    }
 
-    await client
-      .query('ROLLBACK')
-      .then(() => {
-        throw error;
-      })
-      .catch(() => {
-        throw error;
-      });
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      client.release(error as Error);
+      client = null;
+      return NextResponse.json(
+        {
+          message: 'Database down',
+        },
+        {
+          status: 503,
+        }
+      );
+    }
+    if (error instanceof Error && 'code' in error) {
+      client.release(error);
+      client = null;
+    }
+
+    return NextResponse.json(
+      {
+        message: 'Database down',
+      },
+      {
+        status: 503,
+      }
+    );
   } finally {
     if (client) {
       client.release();
@@ -183,7 +211,7 @@ async function rotateAndRespond(
   }
 
   const jwtSignature = jwt.sign({userId}, process.env.JWT_SECRET as string, {
-    expiresIn: '15m',
+    expiresIn: '15s',
   });
 
   await client.query('COMMIT');

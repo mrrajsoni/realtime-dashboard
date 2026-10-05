@@ -17,7 +17,8 @@ const callRefreshAccessToken = async () => {
   try {
     const token = await refreshAccessToken();
     return token;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'ServiceUnavailable') throw error; // no notify
     authManager.notifySessionExpired();
     throw new Error('AuthExpired');
   }

@@ -10,9 +10,13 @@ export function refreshAccessToken(): Promise<string> {
   // ---------------------------------------------------------------
   pendingRefresh = fetch('/api/auth/refresh', {method: 'POST'})
     .then((response) => {
-      if (response.status !== 200) {
+      if (response.status === 401) {
         throw new Error('AuthExpired');
       }
+      if (response.status === 503) {
+        throw new Error('ServiceUnavailable');
+      }
+      if (!response.ok) throw new Error('ServiceUnavailable');
 
       return response.json();
     })
